@@ -30,6 +30,9 @@ Thumbs.db
 # Claude Code local config
 .claude/
 
+# Local development harness
+.harness/
+
 # Build resources (generated before packaging)
 resources/playwright-browsers/
 
@@ -37,4 +40,3 @@ resources/playwright-browsers/
 coverage/
 playwright-report/
 test-results/
-

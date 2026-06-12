@@ -5,8 +5,6 @@
 
 import { Browser, BrowserContext, Page, chromium } from 'playwright'
 import { existsSync } from 'fs'
-import { join } from 'path'
-import { app } from 'electron'
 import { detectCaptcha, detectProductNotFound, detectRegionBlock } from './page-parser'
 import type { CaptureErrorType } from '../data/types'
 
@@ -30,7 +28,6 @@ const USER_AGENT =
 
 let _browser: Browser | null = null
 let _context: BrowserContext | null = null
-let _browsersPath: string | null = null
 
 /**
  * Configure where Playwright looks for browser binaries.
@@ -40,7 +37,6 @@ let _browsersPath: string | null = null
  * In packaged app: points to the bundled extraResources/playwright-browsers.
  */
 export function setBrowsersPath(dirPath: string): void {
-  _browsersPath = dirPath
   process.env.PLAYWRIGHT_BROWSERS_PATH = dirPath
 }
 

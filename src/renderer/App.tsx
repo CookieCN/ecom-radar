@@ -4,6 +4,7 @@ import { CompetitorList } from './components/CompetitorList'
 import { CompetitorDetail } from './components/CompetitorDetail'
 import { AlertsPanel } from './components/AlertsPanel'
 import { SysInfo } from './components/SysInfo'
+import { ErrorBoundary } from './components/ErrorBoundary'
 
 type View =
   | { page: 'home' }
@@ -92,23 +93,25 @@ function App(): JSX.Element {
       </header>
 
       <main className="app-main">
-        {view.page === 'home' && (
-          <>
-            <section style={{ marginBottom: 24 }}>
-              <AddCompetitor onCaptureDone={onCaptureDone} />
-            </section>
-            <CompetitorList
-              key={refreshKey}
-              onViewDetail={navigateDetail}
-              onRefresh={() => setRefreshKey((k) => k + 1)}
-            />
-          </>
-        )}
-        {view.page === 'alerts' && <AlertsPanel />}
-        {view.page === 'detail' && (
-          <CompetitorDetail competitorId={view.competitorId} onBack={navigateHome} />
-        )}
-        {view.page === 'sysinfo' && <SysInfo />}
+        <ErrorBoundary>
+          {view.page === 'home' && (
+            <>
+              <section style={{ marginBottom: 24 }}>
+                <AddCompetitor onCaptureDone={onCaptureDone} />
+              </section>
+              <CompetitorList
+                key={refreshKey}
+                onViewDetail={navigateDetail}
+                onRefresh={() => setRefreshKey((k) => k + 1)}
+              />
+            </>
+          )}
+          {view.page === 'alerts' && <AlertsPanel />}
+          {view.page === 'detail' && (
+            <CompetitorDetail competitorId={view.competitorId} onBack={navigateHome} />
+          )}
+          {view.page === 'sysinfo' && <SysInfo />}
+        </ErrorBoundary>
       </main>
     </div>
   )

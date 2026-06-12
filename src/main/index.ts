@@ -4,7 +4,7 @@ import { writeFileSync } from 'fs'
 import { is } from '@electron-toolkit/utils'
 import { IPC_CHANNELS, HealthCheckResult, DbHealthCheckResult, CaptureRequest, CaptureResponse, CompetitorListItem, CompetitorDetail, AlertItem, ManualCaptureData } from '../shared/ipc'
 import { initDatabase, getDatabase, closeDatabase, getDbPath, CompetitorsRepository, SnapshotsRepository, AlertsRepository, MonitorJobsRepository } from '../data'
-import { captureProduct, closeBrowser, setBrowsersPath, ensureChromiumInstalled } from '../capture'
+import { captureProduct, closeBrowser, setBrowsersPath, checkChromiumAvailable } from '../capture'
 import type { NewSnapshot } from '../data/types'
 import { startScheduler, stopScheduler, getSchedulerState } from '../scheduler'
 import { runAlertRules } from '../alerts'
@@ -519,14 +519,20 @@ app.whenReady().then(() => {
   // Initialize database before creating window
   initDatabase()
 
-  // Configure Playwright to use userData for browser storage (packaged app)
-  const browsersPath = join(app.getPath('userData'), 'playwright-browsers')
-  setBrowsersPath(browsersPath)
+  // Configure Playwright browser path
+  // In packaged app: bundled in extraResources/playwright-browsers
+  // In dev mode: Playwright's default cache directory
+  if (app.isPackaged) {
+    const bundledPath = join(process.resourcesPath, 'playwright-browsers')
+    setBrowsersPath(bundledPath)
+  }
+  // In dev, don't set — Playwright uses its default cache
 
-  // Ensure Chromium is available (installs on first launch if needed)
-  ensureChromiumInstalled().catch((err) => {
-    console.error('Chromium bootstrap failed:', err.message)
-  })
+  // Verify Chromium is available
+  const chromiumError = checkChromiumAvailable()
+  if (chromiumError) {
+    console.warn('Chromium check:', chromiumError)
+  }
 
   registerIpcHandlers()
   createWindow()

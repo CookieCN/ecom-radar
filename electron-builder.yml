@@ -10,6 +10,12 @@ files:
   - dist-electron
   - dist
 
+extraResources:
+  - from: resources/playwright-browsers
+    to: playwright-browsers
+    filter:
+      - "**/*"
+
 win:
   target:
     - nsis

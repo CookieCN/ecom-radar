@@ -27,6 +27,12 @@ Thumbs.db
 .idea/
 .vscode/
 
+# Claude Code local config
+.claude/
+
+# Build resources (generated before packaging)
+resources/playwright-browsers/
+
 # Test / coverage
 coverage/
 playwright-report/

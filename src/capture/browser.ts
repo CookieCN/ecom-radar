@@ -4,9 +4,9 @@
 // ============================================================
 
 import { Browser, BrowserContext, Page, chromium } from 'playwright'
-import { execSync } from 'child_process'
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'fs'
+import { existsSync } from 'fs'
 import { join } from 'path'
+import { app } from 'electron'
 import { detectCaptcha, detectProductNotFound, detectRegionBlock } from './page-parser'
 import type { CaptureErrorType } from '../data/types'
 
@@ -33,10 +33,11 @@ let _context: BrowserContext | null = null
 let _browsersPath: string | null = null
 
 /**
- * Configure where Playwright stores browser binaries.
+ * Configure where Playwright looks for browser binaries.
  * Must be called before getBrowser().
- * In development this is not needed (uses Playwright's default cache).
- * In packaged app, point to userData so the browser persists.
+ *
+ * In dev mode: uses Playwright's default cache (user's ms-playwright dir).
+ * In packaged app: points to the bundled extraResources/playwright-browsers.
  */
 export function setBrowsersPath(dirPath: string): void {
   _browsersPath = dirPath
@@ -44,61 +45,18 @@ export function setBrowsersPath(dirPath: string): void {
 }
 
 /**
- * Ensure Chromium is installed at the configured path.
- * If missing, runs Playwright's CLI to download it.
- * Throws if installation fails.
+ * Verify Chromium is accessible. Returns an error message if not, or null if OK.
  */
-export async function ensureChromiumInstalled(): Promise<void> {
-  const browsersPath = _browsersPath
-
-  if (!browsersPath) {
-    // Dev mode — Playwright manages its own cache. Just verify it exists.
-    try {
-      // Quick probe: can we find the executable?
-      chromium.executablePath()
-      return // exists
-    } catch {
-      // Not installed — try CLI install
-      runPlaywrightInstall()
-      return
-    }
-  }
-
-  // Packaged app mode — check our managed path
-  mkdirSync(browsersPath, { recursive: true })
-
-  const markerFile = join(browsersPath, '.installed')
-  if (existsSync(markerFile)) {
-    return // Already installed
-  }
-
-  // Check if chromium dir actually exists
-  const entries = existsSync(browsersPath) ? readdirSync(browsersPath) : []
-  if (entries.length > 0) {
-    // Has content — assume installed
-    return
-  }
-
-  // Need to install
+export function checkChromiumAvailable(): string | null {
   try {
-    runPlaywrightInstall()
-    // Write marker file
-    writeFileSync(markerFile, new Date().toISOString())
+    const exePath = chromium.executablePath()
+    if (!existsSync(exePath)) {
+      return `Chromium browser not found at: ${exePath}`
+    }
+    return null // OK
   } catch (err) {
-    throw new Error(
-      `Failed to install Chromium browser. Please ensure you have internet access.\n` +
-        `The app needs Chromium to visit Amazon product pages.\n` +
-        `You can also install it manually: npx playwright install chromium\n` +
-        `Error: ${err instanceof Error ? err.message : String(err)}`
-    )
+    return `Chromium browser is not installed. Please ensure Playwright Chromium is available.\nError: ${err instanceof Error ? err.message : String(err)}`
   }
-}
-
-function runPlaywrightInstall(): void {
-  execSync('npx playwright install chromium', {
-    stdio: 'pipe',
-    timeout: 300_000 // 5 minutes
-  })
 }
 
 export async function getBrowser(): Promise<{ browser: Browser; context: BrowserContext }> {
@@ -143,12 +101,15 @@ export async function loadPage(url: string): Promise<PageLoadOutput> {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
 
-    if (msg.includes('Executable doesn\'t exist') || msg.includes('chromium') && msg.includes('not found')) {
+    if (
+      msg.includes("Executable doesn't exist") ||
+      (msg.includes('chromium') && msg.includes('not found'))
+    ) {
       return {
         success: false,
         errorType: 'UNKNOWN_ERROR',
         errorMessage:
-          'Chromium browser is not installed. Go to System > Scheduler and restart, or run: npx playwright install chromium'
+          'Chromium browser is not installed. The app should have bundled Chromium — please reinstall.'
       }
     }
 
@@ -196,7 +157,8 @@ export async function loadPage(url: string): Promise<PageLoadOutput> {
       return {
         success: false,
         errorType: 'PRODUCT_NOT_FOUND',
-        errorMessage: 'Product page not found. The ASIN may be invalid or the listing may have been removed.'
+        errorMessage:
+          'Product page not found. The ASIN may be invalid or the listing may have been removed.'
       }
     }
 
@@ -205,7 +167,8 @@ export async function loadPage(url: string): Promise<PageLoadOutput> {
       return {
         success: false,
         errorType: 'REGION_BLOCKED',
-        errorMessage: 'This product is not available in your region or cannot be shipped to your location.'
+        errorMessage:
+          'This product is not available in your region or cannot be shipped to your location.'
       }
     }
 
@@ -214,7 +177,8 @@ export async function loadPage(url: string): Promise<PageLoadOutput> {
       return {
         success: false,
         errorType: 'PAGE_LOAD_FAILED',
-        errorMessage: 'Page loaded but returned very little content. Amazon may be blocking the request.'
+        errorMessage:
+          'Page loaded but returned very little content. Amazon may be blocking the request.'
       }
     }
 

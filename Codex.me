@@ -1,0 +1,24 @@
+# Codex.me — Amazon Competitor Radar
+
+## Project Purpose
+Amazon 竞品公开信息本地监控工具。用户输入 Amazon 商品 URL 或 ASIN，App 通过本地浏览器访问公开商品页，记录价格、评分、评论数、库存状态等变化，并在本地展示趋势和提醒。
+
+## Current Status
+全部 10 个 Phase 完成。MVP + V1 功能已交付：Electron 桌面 App，含竞品管理、Playwright 自动采集、趋势图、CSV 导出、本地调度器、变化提醒、手动兜底模式。Windows 打包 OK（188 MB .exe）。
+
+## Next Step
+验收 Agent 检查 → Wilson smoke test → 开源发布。
+
+## Explicitly Out Of Scope
+- 外部 API
+- LLM
+- 云端账号系统
+- 代理池
+- IP 轮换
+- 验证码破解
+- 绕过登录
+- 高频批量抓取
+
+## Handoff Notes
+新 Agent 开工前先读根目录 `AGENTS.md`，再读 `.harness/PRD.md`、`.harness/DEVELOPMENT_PLAN.md`、`.harness/ACCEPTANCE.md`、`.harness/TECH_DECISIONS.md`。
+

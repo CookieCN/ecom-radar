@@ -1,0 +1,33 @@
+appId: com.ecomradar.amazon-competitor-radar
+productName: Amazon Competitor Radar
+copyright: MIT
+
+directories:
+  buildResources: resources
+  output: release
+
+files:
+  - dist-electron
+  - dist
+
+win:
+  target:
+    - nsis
+  artifactName: ${name}-${version}-setup.${ext}
+  sign: null
+  signAndEditExecutable: false
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+
+mac:
+  target:
+    - dmg
+  artifactName: ${name}-${version}.${ext}
+  identity: null
+
+linux:
+  target:
+    - AppImage
+  artifactName: ${name}-${version}.${ext}

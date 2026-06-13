@@ -20,6 +20,10 @@ export function AddCompetitor({ onCaptureDone }: Props): JSX.Element {
       setResult(null)
 
       try {
+        if (!window.api) {
+          setResult({ success: false, errorType: 'UNKNOWN_ERROR', errorMessage: 'App is still loading. Please try again.' })
+          return
+        }
         const res = await window.api.captureRun({ input: trimmed })
         setResult(res)
         if (res.success) {

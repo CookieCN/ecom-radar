@@ -17,16 +17,18 @@ export interface ParsedPageData {
 }
 
 // JSON-LD Product schema shape we extract from
+interface JsonLdOffer {
+  '@type'?: string
+  price?: string | number
+  priceCurrency?: string
+  availability?: string
+}
+
 interface JsonLdProduct {
   '@type'?: string | string[]
   name?: string
   image?: string | string[]
-  offers?: {
-    '@type'?: string
-    price?: string | number
-    priceCurrency?: string
-    availability?: string
-  }
+  offers?: JsonLdOffer | JsonLdOffer[]
   aggregateRating?: {
     '@type'?: string
     ratingValue?: string | number
@@ -166,13 +168,17 @@ function extractFromJsonLdObject(obj: unknown): ParsedPageData | null {
   let availability: string | null = null
 
   if (p.offers) {
-    const rawPrice = p.offers.price
-    if (rawPrice !== undefined && rawPrice !== null) {
-      price = typeof rawPrice === 'string' ? parseFloat(rawPrice) : rawPrice
-      if (Number.isNaN(price)) price = null
+    // Amazon sometimes wraps offers in an array (multiple sellers)
+    const offer = Array.isArray(p.offers) ? p.offers[0] : p.offers
+    if (offer && typeof offer === 'object') {
+      const rawPrice = (offer as Record<string, unknown>).price
+      if (rawPrice !== undefined && rawPrice !== null) {
+        price = typeof rawPrice === 'string' ? parseFloat(rawPrice) : (rawPrice as number)
+        if (Number.isNaN(price)) price = null
+      }
+      currency = (offer as Record<string, unknown>).priceCurrency as string || null
+      availability = parseAvailability((offer as Record<string, unknown>).availability as string)
     }
-    currency = p.offers.priceCurrency || null
-    availability = parseAvailability(p.offers.availability)
   }
 
   let rating: number | null = null
@@ -296,17 +302,34 @@ function extractDomText(html: string, selector: string): string | null {
 }
 
 function extractDomPrice(html: string): number | null {
-  // Try .a-price .a-offscreen pattern: contains "$24.99"
+  // Priority 1: core price display (Amazon's main price container)
+  const coreMatch = html.match(
+    /<span[^>]*class=["'][^"']*a-price[^"']*["'][^>]*data-a-size=["'][^"']*[xbl][^"']*["'][^>]*>[\s\S]*?<span[^>]*class=["'][^"']*a-offscreen[^"']*["'][^>]*>\s*\$?([\d,]+\.?\d*)\s*<\/span>/i
+  )
+  if (coreMatch) return parseFloat(coreMatch[1].replace(/,/g, ''))
+
+  // Priority 2: #price_inside_buybox
+  const m2 = html.match(/<span[^>]*id=["']price_inside_buybox["'][^>]*>[\s\S]*?\$?([\d,]+\.?\d*)/i)
+  if (m2) return parseFloat(m2[1].replace(/,/g, ''))
+
+  // Priority 3: corePriceDisplay_feature_div container
+  const coreDiv = html.match(
+    /<div[^>]*id=["']corePriceDisplay_desktop_feature_div["'][^>]*>([\s\S]*?)<\/div>/i
+  )
+  if (coreDiv) {
+    const priceMatch = coreDiv[1].match(
+      /<span[^>]*class=["'][^"']*a-offscreen[^"']*["'][^>]*>\s*\$?([\d,]+\.?\d*)\s*<\/span>/i
+    )
+    if (priceMatch) return parseFloat(priceMatch[1].replace(/,/g, ''))
+  }
+
+  // Priority 4: generic .a-offscreen (fallback — may be wrong on multi-price pages)
   const m = html.match(
     /<span[^>]*class=["'][^"']*a-offscreen[^"']*["'][^>]*>\s*\$?([\d,]+\.?\d*)\s*<\/span>/i
   )
   if (m) return parseFloat(m[1].replace(/,/g, ''))
 
-  // Try #price_inside_buybox
-  const m2 = html.match(/<span[^>]*id=["']price_inside_buybox["'][^>]*>[\s\S]*?\$?([\d,]+\.?\d*)/i)
-  if (m2) return parseFloat(m2[1].replace(/,/g, ''))
-
-  // Try .a-price-whole + .a-price-fraction
+  // Priority 5: .a-price-whole + .a-price-fraction (last resort)
   const wholeM = html.match(
     /<span[^>]*class=["'][^"']*a-price-whole[^"']*["'][^>]*>\s*([\d,]+)\s*<\/span>/i
   )

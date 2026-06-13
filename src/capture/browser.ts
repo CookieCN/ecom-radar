@@ -27,7 +27,6 @@ const USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
 
 let _browser: Browser | null = null
-let _context: BrowserContext | null = null
 
 /**
  * Configure where Playwright looks for browser binaries.
@@ -63,22 +62,18 @@ export async function getBrowser(): Promise<{ browser: Browser; context: Browser
     })
   }
 
-  if (!_context) {
-    _context = await _browser.newContext({
-      userAgent: USER_AGENT,
-      viewport: { width: 1366, height: 768 },
-      locale: 'en-US'
-    })
-  }
+  // Create a FRESH context for each capture — prevents Amazon from
+  // tracking sessions across multiple product page visits
+  const context = await _browser.newContext({
+    userAgent: USER_AGENT,
+    viewport: { width: 1366, height: 768 },
+    locale: 'en-US'
+  })
 
-  return { browser: _browser, context: _context }
+  return { browser: _browser, context }
 }
 
 export async function closeBrowser(): Promise<void> {
-  if (_context) {
-    await _context.close()
-    _context = null
-  }
   if (_browser) {
     await _browser.close()
     _browser = null
@@ -168,13 +163,13 @@ export async function loadPage(url: string): Promise<PageLoadOutput> {
       }
     }
 
-    // Quick parse sanity check — did we get meaningful content?
-    if (html.length < 500) {
+    // Check if Amazon returned a non-product page (bot detection, sign-in, etc.)
+    if (isNonProductPage(html)) {
       return {
         success: false,
         errorType: 'PAGE_LOAD_FAILED',
         errorMessage:
-          'Page loaded but returned very little content. Amazon may be blocking the request.'
+          'Amazon returned a page without product data. This may be a bot detection page. Try again later or use Manual Capture.'
       }
     }
 
@@ -197,5 +192,21 @@ export async function loadPage(url: string): Promise<PageLoadOutput> {
     }
   } finally {
     await page.close()
+    // Close context after each capture — prevents session tracking across products
+    try { await context.close() } catch { /* already closed */ }
   }
+}
+
+/**
+ * Check if the loaded page is a non-product Amazon page
+ * (e.g. access denied, sign-in wall, empty response).
+ */
+function isNonProductPage(html: string): boolean {
+  // No product title element
+  if (!/id=["']productTitle["']/i.test(html)) return true
+  // No core price element
+  if (!/apex-pricetopay-value/i.test(html) && !/corePrice_feature_div/i.test(html)) return true
+  // Very short response (likely blocked)
+  if (html.length < 2000) return true
+  return false
 }

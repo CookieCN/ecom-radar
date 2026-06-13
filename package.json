@@ -17,7 +17,7 @@
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css,html}\"",
     "bundle:chromium": "node scripts/bundle-playwright.mjs",
     "package:win": "npm run build && npm run bundle:chromium && electron-builder --win && npm run rebuild:node",
-    "rebuild:electron": "npx electron-rebuild",
+    "rebuild:electron": "npm_config_target=33.4.11 npm_config_runtime=electron npm_config_disturl=https://electronjs.org/headers npm_config_build_from_source=true npm rebuild better-sqlite3",
     "rebuild:node": "npm rebuild better-sqlite3",
     "typecheck:main": "tsc --noEmit -p tsconfig.node.json",
     "typecheck:renderer": "tsc --noEmit -p tsconfig.web.json",

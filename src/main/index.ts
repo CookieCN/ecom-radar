@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell, dialog } from 'electron'
+import { app, BrowserWindow, ipcMain, shell, dialog, Menu } from 'electron'
 import { join } from 'path'
 import { writeFileSync } from 'fs'
 import { is } from '@electron-toolkit/utils'
@@ -533,6 +533,9 @@ app.whenReady().then(() => {
   if (chromiumError) {
     console.warn('Chromium check:', chromiumError)
   }
+
+  // Hide native menu bar — app uses in-app navigation
+  Menu.setApplicationMenu(null)
 
   registerIpcHandlers()
   createWindow()

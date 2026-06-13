@@ -1,4 +1,5 @@
 import { useState, useCallback, FormEvent } from 'react'
+import { useT } from '../i18n'
 import type { CaptureResponse } from '../../shared/ipc'
 
 interface Props {
@@ -6,6 +7,7 @@ interface Props {
 }
 
 export function AddCompetitor({ onCaptureDone }: Props): JSX.Element {
+  const t = useT()
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<CaptureResponse | null>(null)
@@ -21,7 +23,7 @@ export function AddCompetitor({ onCaptureDone }: Props): JSX.Element {
 
       try {
         if (!window.api) {
-          setResult({ success: false, errorType: 'UNKNOWN_ERROR', errorMessage: 'App is still loading. Please try again.' })
+          setResult({ success: false, errorType: 'UNKNOWN_ERROR', errorMessage: t('errors.stillLoading') })
           return
         }
         const res = await window.api.captureRun({ input: trimmed })
@@ -40,20 +42,20 @@ export function AddCompetitor({ onCaptureDone }: Props): JSX.Element {
         setLoading(false)
       }
     },
-    [input, loading, onCaptureDone]
+    [input, loading, onCaptureDone, t]
   )
 
   return (
     <div className="card">
       <div className="card-header">
-        <span className="card-title">Add Competitor</span>
+        <span className="card-title">{t('add.title')}</span>
       </div>
       <div className="card-body">
         <form className="add-form" onSubmit={handleSubmit}>
           <input
             className="input"
             type="text"
-            placeholder="Paste Amazon URL or ASIN (e.g. B09N3YBZ7D)"
+            placeholder={t('add.placeholder')}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             disabled={loading}
@@ -61,35 +63,33 @@ export function AddCompetitor({ onCaptureDone }: Props): JSX.Element {
           />
           <button className="btn btn-primary" type="submit" disabled={loading || !input.trim()}>
             {loading ? (
-              <>
-                <span className="spinner" /> Capturing…
-              </>
+              <><span className="spinner" /> {t('add.capturing')}</>
             ) : (
-              'Add & Capture'
+              t('add.button')
             )}
           </button>
         </form>
         <p className="add-hint">
-          Accepts <code>https://www.amazon.com/dp/B0EXAMPLE</code> or bare ASIN like{' '}
-          <code>B0EXAMPLE1</code>
+          {t('add.hint', 'https://www.amazon.com/dp/B0EXAMPLE', 'B0EXAMPLE1')}
         </p>
 
         {result && (
-          <div className={`capture-result`}>
+          <div className="capture-result">
             {result.success ? (
               <div className="alert alert-success">
                 <span className="alert-icon">&#10003;</span>
                 <div>
-                  <strong>Captured successfully</strong> — {result.title || 'Product'}
+                  <strong>{t('add.success')}</strong>
+                  {result.title && <> — {result.title}</>}
                   {result.price && <> at ${result.price}</>}
-                  {result.rating && <> &middot; {result.rating}&#9733;</>}
+                  {result.rating && <> · {result.rating}&#9733;</>}
                 </div>
               </div>
             ) : (
               <div className="alert alert-error">
                 <span className="alert-icon">&#10007;</span>
                 <div>
-                  <strong>{result.errorType || 'Error'}</strong> — {result.errorMessage}
+                  <strong>{result.errorType || t('add.error')}</strong> — {result.errorMessage}
                 </div>
               </div>
             )}

@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
+import { useT } from './i18n'
 import { AddCompetitor } from './components/AddCompetitor'
 import { CompetitorList } from './components/CompetitorList'
 import { CompetitorDetail } from './components/CompetitorDetail'
@@ -13,6 +14,7 @@ type View =
   | { page: 'sysinfo' }
 
 function App(): JSX.Element {
+  const t = useT()
   const [view, setView] = useState<View>({ page: 'home' })
   const [refreshKey, setRefreshKey] = useState(0)
   const [unreadCount, setUnreadCount] = useState(0)
@@ -49,20 +51,20 @@ function App(): JSX.Element {
       <header className="app-header">
         <div className="app-header-left">
           <div className="app-logo">R</div>
-          <span className="app-title">Amazon Competitor Radar</span>
+          <span className="app-title">{t('app.title')}</span>
         </div>
         <nav className="app-nav">
           <button
             className={`nav-btn ${view.page === 'home' ? 'active' : ''}`}
             onClick={navigateHome}
           >
-            Dashboard
+            {t('nav.dashboard')}
           </button>
           <button
             className={`nav-btn ${view.page === 'alerts' ? 'active' : ''}`}
             onClick={() => setView({ page: 'alerts' })}
           >
-            Alerts
+            {t('nav.alerts')}
             {unreadCount > 0 && (
               <span
                 style={{
@@ -87,7 +89,7 @@ function App(): JSX.Element {
             className={`nav-btn ${view.page === 'sysinfo' ? 'active' : ''}`}
             onClick={() => setView({ page: 'sysinfo' })}
           >
-            System
+            {t('nav.system')}
           </button>
         </nav>
       </header>

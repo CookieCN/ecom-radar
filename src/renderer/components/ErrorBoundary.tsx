@@ -1,12 +1,10 @@
 import { Component, ReactNode } from 'react'
 
-interface Props {
-  children: ReactNode
-}
+interface Props { children: ReactNode }
+interface State { hasError: boolean; error: Error | null }
 
-interface State {
-  hasError: boolean
-  error: Error | null
+function isZh(): boolean {
+  try { return navigator.language?.startsWith('zh') } catch { return false }
 }
 
 export class ErrorBoundary extends Component<Props, State> {
@@ -18,21 +16,18 @@ export class ErrorBoundary extends Component<Props, State> {
 
   render(): ReactNode {
     if (this.state.hasError) {
+      const zh = isZh()
       return (
         <div className="card" style={{ marginTop: 24 }}>
           <div className="card-body">
             <div className="alert alert-error">
               <div>
-                <strong>Something went wrong</strong>
+                <strong>{zh ? '出现异常' : 'Something went wrong'}</strong>
                 <pre style={{ marginTop: 8, fontSize: 12, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                   {this.state.error?.message || 'Unknown error'}
                 </pre>
-                <button
-                  className="btn btn-secondary"
-                  style={{ marginTop: 12 }}
-                  onClick={() => this.setState({ hasError: false, error: null })}
-                >
-                  Try Again
+                <button className="btn btn-secondary" style={{ marginTop: 12 }} onClick={() => this.setState({ hasError: false, error: null })}>
+                  {zh ? '重试' : 'Try Again'}
                 </button>
               </div>
             </div>
@@ -40,7 +35,6 @@ export class ErrorBoundary extends Component<Props, State> {
         </div>
       )
     }
-
     return this.props.children
   }
 }

@@ -302,46 +302,17 @@ function extractDomText(html: string, selector: string): string | null {
 }
 
 function extractDomPrice(html: string): number | null {
-  // Strategy: find the core price container, extract its first .a-offscreen.
-  // Amazon uses different container IDs across page layouts.
-
-  // Priority 1: corePrice_feature_div or corePriceDisplay_desktop_feature_div
-  const coreDiv = html.match(
-    /<div[^>]*id=["']corePrice(?:Display_desktop)?_feature_div["'][^>]*>([\s\S]*?)<div[^>]*id=["']/i
-  ) || html.match(
-    /<div[^>]*id=["']corePrice(?:Display_desktop)?_feature_div["'][^>]*>([\s\S]*?)<\/div>/i
-  )
-  if (coreDiv) {
-    // Inside core price, find the first .a-offscreen — this is the main price
-    const pm = coreDiv[1].match(
-      /<span[^>]*class=["'][^"']*a-offscreen[^"']*["'][^>]*>\s*\$?([\d,]+\.?\d*)\s*<\/span>/i
-    )
-    if (pm) return parseFloat(pm[1].replace(/,/g, ''))
-  }
-
-  // Priority 2: apex-pricetopay-value (Amazon's main price identifier)
+  // Priority 1: apex-pricetopay-value — Amazon's main price badge (most reliable)
   const apexMatch = html.match(
-    /<span[^>]*class=["'][^"']*apex-pricetopay-value[^"']*["'][^>]*>[\s\S]*?<span[^>]*class=["'][^"']*a-offscreen[^"']*["'][^>]*>\s*\$?([\d,]+\.?\d*)\s*<\/span>/i
+    /apex-pricetopay-value[^>]*>[\s\S]*?a-offscreen[^>]*>\s*\$?([\d,]+\.?\d*)/i
   )
   if (apexMatch) return parseFloat(apexMatch[1].replace(/,/g, ''))
 
-  // Priority 3: #price_inside_buybox
-  const m2 = html.match(/<span[^>]*id=["']price_inside_buybox["'][^>]*>[\s\S]*?\$?([\d,]+\.?\d*)/i)
+  // Priority 2: #price_inside_buybox
+  const m2 = html.match(/id=["']price_inside_buybox["'][^>]*>[\s\S]*?\$?([\d,]+\.?\d*)/i)
   if (m2) return parseFloat(m2[1].replace(/,/g, ''))
 
-  // Priority 4: a-price with data-a-size (xl, l, b — Amazon's main price sizes)
-  const sized = html.match(
-    /<span[^>]*class=["'][^"']*a-price[^"']*["'][^>]*data-a-size=["'][xbl][^"']*["'][^>]*>[\s\S]*?<span[^>]*class=["'][^"']*a-offscreen[^"']*["'][^>]*>\s*\$?([\d,]+\.?\d*)\s*<\/span>/i
-  )
-  if (sized) return parseFloat(sized[1].replace(/,/g, ''))
-
-  // Priority 5: generic .a-offscreen (first match — most reliable fallback for simple pages)
-  const m = html.match(
-    /<span[^>]*class=["'][^"']*a-offscreen[^"']*["'][^>]*>\s*\$?([\d,]+\.?\d*)\s*<\/span>/i
-  )
-  if (m) return parseFloat(m[1].replace(/,/g, ''))
-
-  // Priority 6: .a-price-whole + .a-price-fraction (last resort)
+  // Priority 3: a-price-whole + a-price-fraction
   const wholeM = html.match(
     /<span[^>]*class=["'][^"']*a-price-whole[^"']*["'][^>]*>\s*([\d,]+)\s*<\/span>/i
   )
@@ -353,6 +324,12 @@ function extractDomPrice(html: string): number | null {
     const frac = fracM ? parseInt(fracM[1], 10) / 100 : 0
     return whole + frac
   }
+
+  // Priority 4: generic .a-offscreen with $ prefix (first match)
+  const m = html.match(
+    /<span[^>]*class=["'][^"']*a-offscreen[^"']*["'][^>]*>\s*\$([\d,]+\.?\d*)\s*<\/span>/i
+  )
+  if (m) return parseFloat(m[1].replace(/,/g, ''))
 
   return null
 }

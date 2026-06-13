@@ -116,6 +116,11 @@ export function detectRegionBlock(html: string): boolean {
 function extractFromJsonLd(html: string): ParsedPageData | null {
   const scripts = extractJsonLdScripts(html)
 
+  if (scripts.length === 0) {
+    console.log('[parser] no JSON-LD scripts found')
+    return null
+  }
+
   for (const json of scripts) {
     if (!json) continue
 
@@ -123,6 +128,7 @@ function extractFromJsonLd(html: string): ParsedPageData | null {
       const parsed = JSON.parse(json)
       const result = extractFromJsonLdObject(parsed)
       if (result && (result.title || result.price)) {
+        console.log('[parser] JSON-LD extracted:', JSON.stringify({ title: result.title, price: result.price, rating: result.rating }))
         return result
       }
     } catch {
@@ -130,6 +136,7 @@ function extractFromJsonLd(html: string): ParsedPageData | null {
     }
   }
 
+  console.log('[parser] JSON-LD found but no Product data extracted')
   return null
 }
 
@@ -282,7 +289,7 @@ function parseMetaInt(html: string, property: string): number | null {
 
 function extractFromDom(html: string): ParsedPageData {
   return {
-    title: extractDomText(html, '#productTitle'),
+    title: extractDomTitle(html),
     price: extractDomPrice(html),
     currency: null, // DOM doesn't reliably give currency
     rating: extractDomRating(html),
@@ -292,25 +299,24 @@ function extractFromDom(html: string): ParsedPageData {
   }
 }
 
-function extractDomText(html: string, selector: string): string | null {
-  // Simple regex-based extraction for known Amazon selectors
-  if (selector === '#productTitle') {
-    const m = html.match(/<span[^>]*id=["']productTitle["'][^>]*>([\s\S]*?)<\/span>/i)
-    if (m) return cleanText(m[1])
-  }
-  return null
-}
-
 function extractDomPrice(html: string): number | null {
   // Priority 1: apex-pricetopay-value — Amazon's main price badge (most reliable)
   const apexMatch = html.match(
     /apex-pricetopay-value[^>]*>[\s\S]*?a-offscreen[^>]*>\s*\$?([\d,]+\.?\d*)/i
   )
-  if (apexMatch) return parseFloat(apexMatch[1].replace(/,/g, ''))
+  if (apexMatch) {
+    const price = parseFloat(apexMatch[1].replace(/,/g, ''))
+    console.log('[parser] apex price found:', price)
+    return price
+  }
+  console.log('[parser] apex-pricetopay-value NOT found in page')
 
   // Priority 2: #price_inside_buybox
   const m2 = html.match(/id=["']price_inside_buybox["'][^>]*>[\s\S]*?\$?([\d,]+\.?\d*)/i)
-  if (m2) return parseFloat(m2[1].replace(/,/g, ''))
+  if (m2) {
+    console.log('[parser] buybox price found:', m2[1])
+    return parseFloat(m2[1].replace(/,/g, ''))
+  }
 
   // Priority 3: a-price-whole + a-price-fraction
   const wholeM = html.match(
@@ -322,6 +328,7 @@ function extractDomPrice(html: string): number | null {
   if (wholeM) {
     const whole = parseFloat(wholeM[1].replace(/,/g, ''))
     const frac = fracM ? parseInt(fracM[1], 10) / 100 : 0
+    console.log('[parser] whole+fraction price found:', whole + frac)
     return whole + frac
   }
 
@@ -329,8 +336,23 @@ function extractDomPrice(html: string): number | null {
   const m = html.match(
     /<span[^>]*class=["'][^"']*a-offscreen[^"']*["'][^>]*>\s*\$([\d,]+\.?\d*)\s*<\/span>/i
   )
-  if (m) return parseFloat(m[1].replace(/,/g, ''))
+  if (m) {
+    console.log('[parser] generic a-offscreen price found:', m[1])
+    return parseFloat(m[1].replace(/,/g, ''))
+  }
 
+  console.log('[parser] NO price found on page')
+  return null
+}
+
+function extractDomTitle(html: string): string | null {
+  const m = html.match(/<span[^>]*id=["']productTitle["'][^>]*>([\s\S]*?)<\/span>/i)
+  if (m) {
+    const title = m[1].replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim()
+    console.log('[parser] title found:', title.slice(0, 80))
+    return title
+  }
+  console.log('[parser] #productTitle NOT found')
   return null
 }
 

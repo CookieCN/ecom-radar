@@ -66,6 +66,7 @@ export async function captureProduct(input: string): Promise<CaptureOutput> {
   let pageData
   try {
     pageData = parseProductPage(pageResult.html, pageResult.finalUrl)
+    console.log('[capture] parsed:', JSON.stringify({ url: product.url, title: pageData.title, price: pageData.price, rating: pageData.rating, reviews: pageData.reviewCount, availability: pageData.availability }))
   } catch (err) {
     return {
       success: false,

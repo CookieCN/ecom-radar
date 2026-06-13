@@ -7,6 +7,7 @@ export function SysInfo(): JSX.Element {
   const [schedState, setSchedState] = useState<string>('unknown')
 
   useEffect(() => {
+    if (!window.api) return
     window.api.healthCheck().then(setHealth).catch(() => {})
     window.api.dbHealthCheck().then(setDbHealth).catch(() => {})
     window.api.schedulerStatus().then((s) => setSchedState(s.state)).catch(() => {})

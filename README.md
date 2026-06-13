@@ -36,15 +36,18 @@ Run the `.exe` (Windows), `.dmg` (macOS), or `.AppImage` (Linux) and follow the 
 ### Build from source
 
 ```bash
-git clone https://github.com/wilson-g/amazon-competitor-radar.git
-cd amazon-competitor-radar
+git clone https://github.com/CookieCN/ecom-radar.git
+cd ecom-radar
 npm install
-npm run dev        # start in development mode
-npm run build      # build for production
-npm run package:win  # create Windows installer
+npm run rebuild:electron  # native addon must match Electron's Node.js
+npm run dev               # start in development mode
+npm run rebuild:node      # switch back for system Node (before npm test)
+npm test                  # run 179 tests
+npm run build             # build for production
+npm run package:win       # create Windows installer (217 MB with Chromium)
 ```
 
-On first launch, the app downloads Chromium for Playwright (~180 MB, one-time).
+**Important:** `better-sqlite3` is a native addon. `npm run dev` needs Electron ABI → run `npm run rebuild:electron` first. `npm test` needs system Node ABI → run `npm run rebuild:node` first. `npm run package:win` handles this automatically.
 
 ## Usage
 

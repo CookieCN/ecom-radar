@@ -17,6 +17,7 @@
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css,html}\"",
     "bundle:chromium": "node scripts/bundle-playwright.mjs",
     "package:win": "npm run build && npm run bundle:chromium && electron-builder --win && npm run rebuild:node",
+    "rebuild:electron": "npx electron-rebuild",
     "rebuild:node": "npm rebuild better-sqlite3",
     "typecheck:main": "tsc --noEmit -p tsconfig.node.json",
     "typecheck:renderer": "tsc --noEmit -p tsconfig.web.json",

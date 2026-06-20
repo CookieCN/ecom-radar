@@ -6,9 +6,26 @@ interface Props {
   onCaptureDone: () => void
 }
 
+const MARKETPLACE_OPTIONS = [
+  'US',
+  'UK',
+  'DE',
+  'FR',
+  'IT',
+  'ES',
+  'JP',
+  'CA',
+  'MX',
+  'BR',
+  'AU',
+  'IN',
+  'AE'
+]
+
 export function AddCompetitor({ onCaptureDone }: Props): JSX.Element {
   const t = useT()
   const [input, setInput] = useState('')
+  const [marketplace, setMarketplace] = useState('')
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<CaptureResponse | null>(null)
 
@@ -17,6 +34,14 @@ export function AddCompetitor({ onCaptureDone }: Props): JSX.Element {
       e.preventDefault()
       const trimmed = input.trim()
       if (!trimmed || loading) return
+      if (!marketplace) {
+        setResult({
+          success: false,
+          errorType: 'PARSER_FAILED',
+          errorMessage: t('add.marketplaceRequired')
+        })
+        return
+      }
 
       setLoading(true)
       setResult(null)
@@ -26,7 +51,7 @@ export function AddCompetitor({ onCaptureDone }: Props): JSX.Element {
           setResult({ success: false, errorType: 'UNKNOWN_ERROR', errorMessage: t('errors.stillLoading') })
           return
         }
-        const res = await window.api.captureRun({ input: trimmed })
+        const res = await window.api.captureRun({ input: trimmed, marketplace })
         setResult(res)
         if (res.success) {
           setInput('')
@@ -42,7 +67,7 @@ export function AddCompetitor({ onCaptureDone }: Props): JSX.Element {
         setLoading(false)
       }
     },
-    [input, loading, onCaptureDone, t]
+    [input, loading, marketplace, onCaptureDone, t]
   )
 
   return (
@@ -52,6 +77,19 @@ export function AddCompetitor({ onCaptureDone }: Props): JSX.Element {
       </div>
       <div className="card-body">
         <form className="add-form" onSubmit={handleSubmit}>
+          <select
+            className="input add-marketplace-select"
+            value={marketplace}
+            onChange={(e) => setMarketplace(e.target.value)}
+            disabled={loading}
+            required
+            aria-label={t('add.marketplaceLabel')}
+          >
+            <option value="">{t('add.marketplacePlaceholder')}</option>
+            {MARKETPLACE_OPTIONS.map((code) => (
+              <option key={code} value={code}>{code}</option>
+            ))}
+          </select>
           <input
             className="input"
             type="text"
@@ -61,7 +99,7 @@ export function AddCompetitor({ onCaptureDone }: Props): JSX.Element {
             disabled={loading}
             autoFocus
           />
-          <button className="btn btn-primary" type="submit" disabled={loading || !input.trim()}>
+          <button className="btn btn-primary" type="submit" disabled={loading || !input.trim() || !marketplace}>
             {loading ? (
               <><span className="spinner" /> {t('add.capturing')}</>
             ) : (

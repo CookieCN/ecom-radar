@@ -4,7 +4,23 @@
 Amazon 竞品公开信息本地监控工具。用户输入 Amazon 商品 URL 或 ASIN，App 通过本地浏览器访问公开商品页，记录价格、评分、评论数、库存状态等变化，并在本地展示趋势和提醒。
 
 ## Current Status
+2026-06-20 已修复 Amazon US 配送地弹窗变体：兼容旧版 GLUX、新版 ZIP/postal 可访问属性和两阶段 Change/Enter ZIP 流程；失败时返回弹窗诊断文本。
+
+2026-06-20 店铺采集进一步改为安全降级：卖家资料与 ASIN 清单不依赖配送地；空位置弹窗只跳过价格、Coupon 和库存深挖，不再让整店报错，也不保存未验证价格。
+
+2026-06-19 已完成 Seller Storefront 分层监控：最多 5 家店、每日资料页和 3 个列表页、每店 5 个详情深挖、变化事件与独立 ASIN 升级；商品和店铺共享默认 80/最高 100 页预算及站点风控冷却。Brand Store 已列为 Phase 12。
+
 全部 10 个 Phase 完成。MVP + V1 功能已交付：Electron 桌面 App，含竞品管理、Playwright 自动采集、趋势图、CSV 导出、本地调度器、变化提醒、手动兜底模式。Windows 打包 OK（188 MB .exe）。
+
+2026-06-19 已修复商品图片显示：Renderer 允许 Amazon 图片 CDN，列表展示缩略图，采集器兼容 Amazon 多种图片属性。
+
+2026-06-19 已修复德国站价格误采：支持小数逗号与 EUR，价格只从主价格 / Buy Box 区域提取，地区限制页面不再写入其他区域的价格。
+
+2026-06-19 已加入站点配送基准：13 个 marketplace 各自使用可配置邮编/城市、locale、timezone 和币种；快照保存 Deal/普通价/原价及配送地。
+
+2026-06-19 验收重试通过：完整测试 197 项通过；`B0DCBB2YTR` 使用 Amazon DE + `47495` 实抓为 EUR 79.98 Prime Deal、原标价 EUR 99.99、评分 4.6、评论 9,841、库存 `Auf Lager`，图片正确。
+
+2026-06-19 已补齐 13 站点配置契约矩阵：德国默认配送基准统一为 `47495`，全量测试增至 214 项并全部通过；Electron ABI 已恢复，桌面 App 重启正常。
 
 ## Next Step
 验收 Agent 检查 → Wilson smoke test → 开源发布。
@@ -21,4 +37,3 @@ Amazon 竞品公开信息本地监控工具。用户输入 Amazon 商品 URL 或
 
 ## Handoff Notes
 新 Agent 开工前先读根目录 `AGENTS.md`，再读 `.harness/PRD.md`、`.harness/DEVELOPMENT_PLAN.md`、`.harness/ACCEPTANCE.md`、`.harness/TECH_DECISIONS.md`。
-

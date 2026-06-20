@@ -3,27 +3,13 @@
 // Extracts ASIN and marketplace from user input.
 // ============================================================
 
-/**
- * Marketplace codes and their domains.
- * Order matters — longer domains (e.g. amazon.co.uk) must be
- * checked before shorter ones (amazon.com) to avoid partial matches.
- */
-const MARKETPLACE_MAP: Array<{ domain: string; code: string }> = [
-  { domain: 'amazon.co.uk', code: 'UK' },
-  { domain: 'amazon.co.jp', code: 'JP' },
-  { domain: 'amazon.com.au', code: 'AU' },
-  { domain: 'amazon.com.br', code: 'BR' },
-  { domain: 'amazon.com.mx', code: 'MX' },
-  { domain: 'amazon.com', code: 'US' },
-  { domain: 'amazon.de', code: 'DE' },
-  { domain: 'amazon.fr', code: 'FR' },
-  { domain: 'amazon.ca', code: 'CA' },
-  { domain: 'amazon.it', code: 'IT' },
-  { domain: 'amazon.es', code: 'ES' },
-  { domain: 'amazon.in', code: 'IN' },
-  { domain: 'amazon.ae', code: 'AE' },
-  { domain: 'amzn.com', code: 'US' }
-]
+import {
+  MARKETPLACE_CONFIGS,
+  getMarketplaceByDomain,
+  getMarketplaceConfig
+} from '../shared/marketplaces'
+
+const MARKETPLACE_CODES = new Set(MARKETPLACE_CONFIGS.map((entry) => entry.code))
 
 // ASIN: exactly 10 chars, starts with B, 9 alphanumeric digits/chars after
 const ASIN_RE = /^B[A-Z0-9]{9}$/
@@ -57,20 +43,31 @@ export type ParseOutput = ParseResult | ParseError
 /**
  * Parse user input — either an Amazon URL or a bare ASIN.
  */
-export function parseAmazonInput(input: string): ParseOutput {
+export function parseAmazonInput(input: string, selectedMarketplace?: string): ParseOutput {
   const trimmed = input.trim()
 
   if (!trimmed) {
     return { success: false, error: 'Input is empty' }
   }
 
+  if (selectedMarketplace && !MARKETPLACE_CODES.has(selectedMarketplace)) {
+    return { success: false, error: `Unsupported Amazon marketplace: ${selectedMarketplace}` }
+  }
+
   // Detect if it looks like a URL
   if (isUrl(trimmed)) {
-    return parseUrl(trimmed)
+    const parsed = parseUrl(trimmed)
+    if (parsed.success && selectedMarketplace && parsed.data.marketplace !== selectedMarketplace) {
+      return {
+        success: false,
+        error: `Selected marketplace is ${selectedMarketplace}, but this URL belongs to ${parsed.data.marketplace}. Choose ${parsed.data.marketplace} or paste a matching URL.`
+      }
+    }
+    return parsed
   }
 
   // Try bare ASIN
-  return parseBareAsin(trimmed)
+  return parseBareAsin(trimmed, selectedMarketplace ?? 'US')
 }
 
 function isUrl(input: string): boolean {
@@ -119,7 +116,7 @@ function parseUrl(url: string): ParseOutput {
   }
 }
 
-function parseBareAsin(input: string): ParseOutput {
+function parseBareAsin(input: string, marketplace: string): ParseOutput {
   const upper = input.toUpperCase().trim()
 
   if (!ASIN_RE.test(upper)) {
@@ -146,27 +143,19 @@ function parseBareAsin(input: string): ParseOutput {
     success: true,
     data: {
       asin: upper,
-      marketplace: 'US', // default when bare ASIN
-      url: `https://www.amazon.com/dp/${upper}`
+      marketplace,
+      url: `https://www.${getDomain(marketplace)}/dp/${upper}`
     }
   }
 }
 
 function getMarketplace(hostname: string): string | null {
-  const lower = hostname.toLowerCase().replace(/^www\./, '')
-
-  for (const entry of MARKETPLACE_MAP) {
-    if (lower === entry.domain || lower.endsWith('.' + entry.domain)) {
-      return entry.code
-    }
-  }
-
-  return null
+  if (/^(?:www\.)?amzn\.com$/i.test(hostname)) return 'US'
+  return getMarketplaceByDomain(hostname)?.code ?? null
 }
 
 function getDomain(marketplace: string): string {
-  const entry = MARKETPLACE_MAP.find((e) => e.code === marketplace)
-  return entry?.domain ?? 'amazon.com'
+  return getMarketplaceConfig(marketplace)?.domain ?? 'amazon.com'
 }
 
 function extractAsin(pathAndQuery: string): string | null {

@@ -26,6 +26,8 @@
     "src/data/**/*.ts",
     "src/scheduler/**/*.ts",
     "src/alerts/**/*.ts",
+    "src/monitoring/**/*.ts",
+    "src/storefront/**/*.ts",
     "electron.vite.config.ts",
     "vitest.config.ts"
   ],

@@ -389,8 +389,12 @@ body {
 }
 
 @keyframes pulse {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 /* Spinner */
@@ -405,7 +409,9 @@ body {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* ============================================================
@@ -420,6 +426,10 @@ body {
 .add-form .input {
   flex: 1;
   font-size: 13px;
+}
+
+.add-form .add-marketplace-select {
+  flex: 0 0 132px;
 }
 
 .add-form .btn-primary {
@@ -505,11 +515,52 @@ tbody tr:last-child td {
 
 .cell-title {
   font-weight: 500;
-  max-width: 240px;
+  min-width: 220px;
+  max-width: 280px;
+  color: var(--text-primary);
+}
+
+.product-cell {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+.product-thumbnail {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  background: var(--bg-root);
+  object-fit: contain;
+}
+
+.title-link {
+  display: block;
+  min-width: 0;
+  max-width: 220px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.title-link:hover {
+  color: var(--accent);
+}
+
+.title-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: var(--radius-sm);
 }
 
 .cell-price {
@@ -517,6 +568,84 @@ tbody tr:last-child td {
   font-weight: 500;
   font-size: 12px;
   white-space: nowrap;
+}
+
+.price-context-label {
+  display: block;
+  margin-top: 3px;
+  color: var(--accent);
+  font-family: var(--font-sans);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.cell-price-context {
+  min-width: 118px;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.cell-price-context strong,
+.cell-price-context span {
+  display: block;
+}
+
+.cell-price-context strong {
+  color: var(--accent);
+  font-size: 9px;
+  letter-spacing: 0.04em;
+}
+
+.delivery-profile-note {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.delivery-profile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 16px;
+}
+
+.delivery-profile-row {
+  display: grid;
+  grid-template-columns: 34px 38px minmax(100px, 1fr) 64px;
+  align-items: center;
+  gap: 8px;
+}
+
+.delivery-profile-market {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.delivery-profile-currency,
+.delivery-profile-kind {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.delivery-profile-row .input {
+  min-width: 0;
+  padding: 6px 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.delivery-profile-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.delivery-profile-saved {
+  color: var(--status-success);
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .cell-rating {
@@ -734,12 +863,20 @@ tbody tr:last-child td {
    ============================================================ */
 
 @media (max-width: 768px) {
+  .delivery-profile-grid {
+    grid-template-columns: 1fr;
+  }
+
   .app-main {
     padding: var(--space-md);
   }
 
   .add-form {
     flex-direction: column;
+  }
+
+  .add-form .add-marketplace-select {
+    flex: 1 1 auto;
   }
 
   .detail-header {

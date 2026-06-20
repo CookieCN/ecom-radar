@@ -1,10 +1,13 @@
 import Database from 'better-sqlite3'
 import path from 'path'
+import { mkdirSync } from 'fs'
 import { app } from 'electron'
 import { Migration } from './migrations/types'
 import migration001 from './migrations/001_initial'
+import migration002 from './migrations/002_price_context'
+import migration003 from './migrations/003_seller_storefront'
 
-const MIGRATIONS: Migration[] = [migration001]
+const MIGRATIONS: Migration[] = [migration001, migration002, migration003]
 
 let _db: Database.Database | null = null
 
@@ -55,6 +58,10 @@ export function initDatabase(dbPath?: string): Database.Database {
   if (_db) return _db
 
   const resolvedPath = dbPath ?? getDbPath()
+
+  if (resolvedPath !== ':memory:') {
+    mkdirSync(path.dirname(resolvedPath), { recursive: true })
+  }
 
   _db = new Database(resolvedPath)
 

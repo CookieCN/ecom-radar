@@ -3,6 +3,7 @@ import Database from 'better-sqlite3'
 import { createTestDb } from '../helpers/db'
 import { CompetitorsRepository } from '../../src/data/repositories/competitors'
 import { SnapshotsRepository } from '../../src/data/repositories/snapshots'
+import { MonitorJobsRepository } from '../../src/data/repositories/monitor_jobs'
 
 // Test the repository logic behind the new IPC handlers
 
@@ -10,11 +11,13 @@ describe('Competitors IPC handler — DB logic', () => {
   let db: Database.Database
   let competitorsRepo: CompetitorsRepository
   let snapshotsRepo: SnapshotsRepository
+  let jobsRepo: MonitorJobsRepository
 
   beforeEach(() => {
     db = createTestDb()
     competitorsRepo = new CompetitorsRepository(db)
     snapshotsRepo = new SnapshotsRepository(db)
+    jobsRepo = new MonitorJobsRepository(db)
   })
 
   afterEach(() => {
@@ -131,6 +134,19 @@ describe('Competitors IPC handler — DB logic', () => {
       // newest first
       expect(snaps[0].capture_status).toBe('failed')
       expect(snaps[1].capture_status).toBe('success')
+    })
+
+    it('can read the current monitor interval for detail display', () => {
+      const c = createCompetitor('B001')
+      const job = jobsRepo.create({
+        competitor_id: c.id,
+        interval_minutes: 1440,
+        next_run_at: null,
+        enabled: 1
+      })
+
+      expect(job.interval_minutes).toBe(1440)
+      expect(jobsRepo.findByCompetitorId(c.id)!.interval_minutes).toBe(1440)
     })
   })
 

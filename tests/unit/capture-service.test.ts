@@ -19,10 +19,7 @@ function mockPageSuccess(overrides: Partial<{ html: string }> = {}): void {
   })
 }
 
-function mockPageError(
-  errorType: string,
-  errorMessage: string
-): void {
+function mockPageError(errorType: string, errorMessage: string): void {
   mockLoadPage.mockResolvedValue({
     success: false,
     errorType,
@@ -52,7 +49,7 @@ describe('captureProduct — success paths', () => {
 
   it('returns success with full product data from JSON-LD', async () => {
     mockPageSuccess()
-    const result = await captureProduct('B0EXAMPLE1')
+    const result = await captureProduct('B0EXAMPLE1', 'US')
     expect(result.success).toBe(true)
     if (result.success) {
       expect(result.product.asin).toBe('B0EXAMPLE1')
@@ -62,12 +59,19 @@ describe('captureProduct — success paths', () => {
       expect(result.snapshot.rating).toBe(4.3)
       expect(result.snapshot.review_count).toBe(256)
       expect(result.snapshot.capture_status).toBe('success')
+      expect(result.snapshot.delivery_location).toBe('10001')
     }
+  })
+
+  it('passes a custom marketplace delivery location to the browser', async () => {
+    mockPageSuccess()
+    await captureProduct('B0EXAMPLE1', 'DE', '47495')
+    expect(mockLoadPage).toHaveBeenCalledWith('https://www.amazon.de/dp/B0EXAMPLE1', 'DE', '47495')
   })
 
   it('returns success with canonical URL from bare ASIN', async () => {
     mockPageSuccess()
-    const result = await captureProduct('B0EXAMPLE1')
+    const result = await captureProduct('B0EXAMPLE1', 'US')
     if (result.success) {
       expect(result.product.url).toBe('https://www.amazon.com/dp/B0EXAMPLE1')
     }
@@ -75,7 +79,7 @@ describe('captureProduct — success paths', () => {
 
   it('returns success from a full Amazon URL', async () => {
     mockPageSuccess()
-    const result = await captureProduct('https://www.amazon.co.uk/dp/B0EXAMPLE1')
+    const result = await captureProduct('https://www.amazon.co.uk/dp/B0EXAMPLE1', 'UK')
     if (result.success) {
       expect(result.product.marketplace).toBe('UK')
     }
@@ -87,8 +91,19 @@ describe('captureProduct — failure paths', () => {
     vi.clearAllMocks()
   })
 
+  it('returns failure before browser load when marketplace is missing', async () => {
+    const result = await captureProduct('B0EXAMPLE1')
+    expect(result.success).toBe(false)
+    expect(result.product).toBeUndefined()
+    expect(mockLoadPage).not.toHaveBeenCalled()
+    if (!result.success) {
+      expect(result.errorType).toBe('PARSER_FAILED')
+      expect(result.errorMessage).toContain('marketplace is required')
+    }
+  })
+
   it('returns failure for invalid URL (no product)', async () => {
-    const result = await captureProduct('')
+    const result = await captureProduct('', 'US')
     expect(result.success).toBe(false)
     expect(result.product).toBeUndefined()
     if (!result.success) {
@@ -97,14 +112,14 @@ describe('captureProduct — failure paths', () => {
   })
 
   it('returns failure for non-Amazon URL (no product)', async () => {
-    const result = await captureProduct('https://www.ebay.com/item/123')
+    const result = await captureProduct('https://www.ebay.com/item/123', 'US')
     expect(result.success).toBe(false)
     expect(result.product).toBeUndefined()
   })
 
   it('returns failure with product for captcha page', async () => {
     mockPageError('CAPTCHA_DETECTED', 'Captcha detected')
-    const result = await captureProduct('B0EXAMPLE1')
+    const result = await captureProduct('B0EXAMPLE1', 'US')
     expect(result.success).toBe(false)
     expect(result.product).toBeDefined()
     if (!result.success) {
@@ -115,7 +130,7 @@ describe('captureProduct — failure paths', () => {
 
   it('returns failure with product for page timeout', async () => {
     mockPageError('NETWORK_TIMEOUT', 'Page load timed out after 30s')
-    const result = await captureProduct('https://www.amazon.com/dp/B0EXAMPLE1')
+    const result = await captureProduct('https://www.amazon.com/dp/B0EXAMPLE1', 'US')
     expect(result.success).toBe(false)
     expect(result.product).toBeDefined()
     if (!result.success) {
@@ -125,7 +140,7 @@ describe('captureProduct — failure paths', () => {
 
   it('returns failure with product for product not found', async () => {
     mockPageError('PRODUCT_NOT_FOUND', 'Product page not found')
-    const result = await captureProduct('B0EXAMPLE1')
+    const result = await captureProduct('B0EXAMPLE1', 'US')
     expect(result.success).toBe(false)
     expect(result.product).toBeDefined()
     if (!result.success) {
@@ -135,7 +150,7 @@ describe('captureProduct — failure paths', () => {
 
   it('returns failure with product for region block', async () => {
     mockPageError('REGION_BLOCKED', 'Region blocked')
-    const result = await captureProduct('B0EXAMPLE1')
+    const result = await captureProduct('B0EXAMPLE1', 'US')
     expect(result.success).toBe(false)
     expect(result.product).toBeDefined()
     if (!result.success) {
@@ -143,9 +158,21 @@ describe('captureProduct — failure paths', () => {
     }
   })
 
+  it('rejects pricing rendered in the wrong marketplace currency', async () => {
+    mockPageSuccess({
+      html: '<div id="corePrice_feature_div"><span class="a-price"><span class="a-offscreen">14.767JPY</span></span></div><span id="productTitle">Product</span>'
+    })
+    const result = await captureProduct('B0EXAMPLE1', 'DE', '47495')
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.errorType).toBe('DELIVERY_LOCATION_FAILED')
+      expect(result.errorMessage).toContain('returned JPY pricing, expected EUR')
+    }
+  })
+
   it('returns failure with product when parser extracts insufficient fields', async () => {
     mockPageSuccess({ html: fixturePartialProduct() })
-    const result = await captureProduct('B0EXAMPLE1')
+    const result = await captureProduct('B0EXAMPLE1', 'US')
     expect(result.success).toBe(false)
     expect(result.product).toBeDefined()
     if (!result.success) {
@@ -162,7 +189,7 @@ describe('captureProduct — snapshot metadata', () => {
 
   it('sets capture_status to success when >= 2 fields extracted', async () => {
     mockPageSuccess()
-    const result = await captureProduct('B0EXAMPLE1')
+    const result = await captureProduct('B0EXAMPLE1', 'US')
     if (result.success) {
       expect(result.snapshot.capture_status).toBe('success')
       expect(result.snapshot.error_type).toBeNull()
@@ -172,11 +199,9 @@ describe('captureProduct — snapshot metadata', () => {
 
   it('sets captured_at to ISO timestamp', async () => {
     mockPageSuccess()
-    const result = await captureProduct('B0EXAMPLE1')
+    const result = await captureProduct('B0EXAMPLE1', 'US')
     if (result.success) {
-      expect(result.snapshot.captured_at).toMatch(
-        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/
-      )
+      expect(result.snapshot.captured_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)
     }
   })
 })

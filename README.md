@@ -51,6 +51,10 @@ npm run package:win       # create Windows installer (217 MB with Chromium)
 
 ## Usage
 
+Before the first capture, open **System → Marketplace delivery profiles** and review the standard delivery location for each marketplace you monitor. Prices, deals, and inventory are location-dependent; every capture verifies this location before saving data. The defaults provide a consistent benchmark and can be replaced with your target postal code or city.
+
+Snapshots distinguish the displayed price from regular and list prices when Amazon exposes them, and record the currency and delivery location used for the capture.
+
 1. **Add a competitor** — Paste an Amazon URL (e.g. `https://www.amazon.com/dp/B09N3YBZ7D`) or a bare ASIN (`B09N3YBZ7D`) into the input field and click "Add & Capture"
 2. **View the dashboard** — See all competitors with latest price, rating, status, and last capture time
 3. **Drill into details** — Click ▶ to see trend charts and snapshot history

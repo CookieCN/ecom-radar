@@ -4,6 +4,25 @@ import type { CaptureResponse, CompetitorDetail } from '../../shared/ipc'
 
 interface Props { competitor: CompetitorDetail; onSaved: () => void }
 
+function getMarketplaceCurrency(marketplace: string): string {
+  const map: Record<string, string> = {
+    US: 'USD',
+    CA: 'CAD',
+    MX: 'MXN',
+    BR: 'BRL',
+    UK: 'GBP',
+    DE: 'EUR',
+    FR: 'EUR',
+    IT: 'EUR',
+    ES: 'EUR',
+    JP: 'JPY',
+    IN: 'INR',
+    AU: 'AUD',
+    AE: 'AED'
+  }
+  return map[marketplace] ?? 'USD'
+}
+
 export function ManualCapture({ competitor, onSaved }: Props): JSX.Element {
   const t = useT()
   const [price, setPrice] = useState('')
@@ -12,6 +31,7 @@ export function ManualCapture({ competitor, onSaved }: Props): JSX.Element {
   const [availability, setAvailability] = useState(t('manual.inStock'))
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<CaptureResponse | null>(null)
+  const currency = getMarketplaceCurrency(competitor.marketplace)
 
   const handleSubmit = useCallback(async (e: FormEvent) => {
     e.preventDefault()
@@ -47,7 +67,7 @@ export function ManualCapture({ competitor, onSaved }: Props): JSX.Element {
         </button>
         <form onSubmit={handleSubmit}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-            <div><label style={labelStyle}>{t('manual.price')}</label><input className="input" type="number" step="0.01" placeholder="e.g. 24.99" value={price} onChange={(e) => setPrice(e.target.value)} disabled={loading} /></div>
+            <div><label style={labelStyle}>{t('manual.price', currency)}</label><input className="input" type="number" step="0.01" placeholder="e.g. 24.99" value={price} onChange={(e) => setPrice(e.target.value)} disabled={loading} /></div>
             <div><label style={labelStyle}>{t('manual.rating')}</label><input className="input" type="number" step="0.1" min="0" max="5" placeholder="e.g. 4.5" value={rating} onChange={(e) => setRating(e.target.value)} disabled={loading} /></div>
             <div><label style={labelStyle}>{t('manual.reviews')}</label><input className="input" type="number" step="1" placeholder="e.g. 1234" value={reviews} onChange={(e) => setReviews(e.target.value)} disabled={loading} /></div>
             <div><label style={labelStyle}>{t('manual.availability')}</label><select className="input" value={availability} onChange={(e) => setAvailability(e.target.value)} disabled={loading}>

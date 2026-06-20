@@ -14,6 +14,9 @@
 import { existsSync, readdirSync, statSync } from 'fs'
 import { join } from 'path'
 import { execSync } from 'child_process'
+import { createRequire } from 'module'
+
+const require = createRequire(import.meta.url)
 
 const PASS = '\x1b[32m✓\x1b[0m'
 const FAIL = '\x1b[31m✗\x1b[0m'
@@ -98,21 +101,29 @@ if (existsSync(unpackedDir)) {
   check('app.asar exists', () => fileExists(join(unpackedDir, 'resources', 'app.asar')))
 
   // Check for Playwright Chromium in extraResources
-  const extraChromium = join(unpackedDir, 'resources', 'playwright-browsers', 'chromium')
+  const pwBrowsers = join(unpackedDir, 'resources', 'playwright-browsers')
   check('Playwright Chromium bundled', () => {
-    if (!existsSync(extraChromium)) {
-      // Try glob pattern
-      const pwBrowsers = join(unpackedDir, 'resources', 'playwright-browsers')
-      if (existsSync(pwBrowsers)) {
-        const contents = readdirSync(pwBrowsers)
-        if (contents.length > 0) {
-          console.log(`    (found: ${contents.join(', ')})`)
-          return true
-        }
-      }
+    if (!existsSync(pwBrowsers)) {
+      throw new Error('playwright-browsers dir not found')
+    }
+
+    const contents = readdirSync(pwBrowsers).filter((name) => name.startsWith('chromium-'))
+    if (contents.length === 0) {
       throw new Error('Chromium not found in extraResources')
     }
-    dirHasFiles(extraChromium, 50)
+    dirHasFiles(join(pwBrowsers, contents[0]), 50)
+    console.log(`    (found: ${contents[0]})`)
+    return true
+  })
+
+  check('Playwright resolves bundled Chromium executable', () => {
+    process.env.PLAYWRIGHT_BROWSERS_PATH = pwBrowsers
+    const { chromium } = require('playwright')
+    const executablePath = chromium.executablePath()
+    if (!existsSync(executablePath)) {
+      throw new Error(`Executable not found: ${executablePath}`)
+    }
+    console.log(`    (${executablePath})`)
     return true
   })
 

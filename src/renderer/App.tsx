@@ -6,12 +6,14 @@ import { CompetitorDetail } from './components/CompetitorDetail'
 import { AlertsPanel } from './components/AlertsPanel'
 import { SysInfo } from './components/SysInfo'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { SellerStores } from './components/SellerStores'
 
 type View =
   | { page: 'home' }
   | { page: 'alerts' }
   | { page: 'detail'; competitorId: number }
   | { page: 'sysinfo' }
+  | { page: 'stores' }
 
 function App(): JSX.Element {
   const t = useT()
@@ -23,7 +25,9 @@ function App(): JSX.Element {
     try {
       const count = await window.api.alertsCountUnread()
       setUnreadCount(count)
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, [])
 
   useEffect(() => {
@@ -54,6 +58,12 @@ function App(): JSX.Element {
           <span className="app-title">{t('app.title')}</span>
         </div>
         <nav className="app-nav">
+          <button
+            className={`nav-btn ${view.page === 'stores' ? 'active' : ''}`}
+            onClick={() => setView({ page: 'stores' })}
+          >
+            {t('nav.stores')}
+          </button>
           <button
             className={`nav-btn ${view.page === 'home' ? 'active' : ''}`}
             onClick={navigateHome}
@@ -113,6 +123,7 @@ function App(): JSX.Element {
             <CompetitorDetail competitorId={view.competitorId} onBack={navigateHome} />
           )}
           {view.page === 'sysinfo' && <SysInfo />}
+          {view.page === 'stores' && <SellerStores />}
         </ErrorBoundary>
       </main>
     </div>

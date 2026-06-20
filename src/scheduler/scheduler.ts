@@ -6,18 +6,71 @@ import { getDatabase } from '../data'
 import { CompetitorsRepository } from '../data/repositories/competitors'
 import { SnapshotsRepository } from '../data/repositories/snapshots'
 import { MonitorJobsRepository } from '../data/repositories/monitor_jobs'
+import { SettingsRepository } from '../data/repositories/settings'
 import { captureProduct } from '../capture'
 import { runAlertRules } from '../alerts'
+import { getDeliverySettingKey, getMarketplaceConfig } from '../shared/marketplaces'
+import { PageBudgetService, createNavigationAccessGuard } from '../monitoring/page-budget'
+import { SellerStoresRepository } from '../data/repositories/seller_stores'
+import { scanSellerStore } from '../storefront'
 
 const POLL_INTERVAL_MS = 60_000 // check for due jobs every 60 seconds
 const DEFAULT_JOB_INTERVAL_MINUTES = 360 // 6 hours
-const MIN_DELAY_BETWEEN_JOBS_MS = 10_000
+const MAX_DAILY_AUTO_CAPTURES = 2
+const MIN_DELAY_BETWEEN_JOBS_MS = 2 * 60_000
 
 /** Convert Date to SQLite-compatible datetime string: YYYY-MM-DD HH:mm:ss */
 function toSqliteDatetime(date: Date): string {
-  return date.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, '')
+  return date
+    .toISOString()
+    .replace('T', ' ')
+    .replace(/\.\d{3}Z$/, '')
 }
-const MAX_DELAY_BETWEEN_JOBS_MS = 60_000
+
+function getLocalDayBounds(date = new Date()): { start: string; end: string } {
+  const start = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  const end = new Date(start)
+  end.setDate(end.getDate() + 1)
+  return { start: toSqliteDatetime(start), end: toSqliteDatetime(end) }
+}
+
+function getNextMorning(date = new Date()): string {
+  const next = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1, 9, 0, 0)
+  return toSqliteDatetime(next)
+}
+
+function countCapturesToday(db: ReturnType<typeof getDatabase>, competitorId: number): number {
+  const { start, end } = getLocalDayBounds()
+  const row = db
+    .prepare(
+      `SELECT COUNT(*) as count
+       FROM snapshots
+       WHERE competitor_id = ?
+         AND datetime(captured_at) >= datetime(?)
+         AND datetime(captured_at) < datetime(?)`
+    )
+    .get(competitorId, start, end) as { count: number }
+  return row.count
+}
+
+function scheduleNextRun(
+  jobId: number,
+  intervalMinutes: number,
+  jobsRepo: MonitorJobsRepository,
+  db: ReturnType<typeof getDatabase>,
+  competitorId: number
+): void {
+  if (countCapturesToday(db, competitorId) >= MAX_DAILY_AUTO_CAPTURES) {
+    jobsRepo.updateNextRun(jobId, getNextMorning())
+    return
+  }
+
+  const intervalMs = intervalMinutes * 60 * 1000
+  const jitter = Math.floor(Math.random() * 15 * 60 * 1000) // 0-15 min jitter
+  const nextRun = toSqliteDatetime(new Date(Date.now() + intervalMs + jitter))
+  jobsRepo.updateNextRun(jobId, nextRun)
+}
+const MAX_DELAY_BETWEEN_JOBS_MS = 5 * 60_000
 
 type SchedulerState = 'stopped' | 'running' | 'paused'
 
@@ -96,6 +149,7 @@ async function processDueJobs(): Promise<void> {
     const competitorsRepo = new CompetitorsRepository(db)
     const snapshotsRepo = new SnapshotsRepository(db)
     const jobsRepo = new MonitorJobsRepository(db)
+    const budgetService = new PageBudgetService(db)
 
     const dueJobs = jobsRepo.findAllDue()
     const dueJobsFiltered = dueJobs.filter((j) => {
@@ -110,8 +164,37 @@ async function processDueJobs(): Promise<void> {
       const competitor = competitorsRepo.findById(job.competitor_id)
       if (!competitor || competitor.status !== 'active') continue
 
+      if (countCapturesToday(db, competitor.id) >= MAX_DAILY_AUTO_CAPTURES) {
+        jobsRepo.updateNextRun(job.id, getNextMorning())
+        continue
+      }
+
       // Run capture
-      const result = await captureProduct(competitor.url)
+      const config = getMarketplaceConfig(competitor.marketplace)
+      const settingsRepo = new SettingsRepository(db)
+      const deliveryLocation = config
+        ? settingsRepo.getOrDefault(getDeliverySettingKey(config.code), config.defaultLocation)
+        : ''
+      const result = await captureProduct(
+        competitor.url,
+        competitor.marketplace,
+        deliveryLocation,
+        createNavigationAccessGuard(
+          budgetService,
+          competitor.marketplace,
+          'competitor',
+          competitor.id
+        )
+      )
+
+      if (
+        !result.success &&
+        (result.errorType === 'PAGE_BUDGET_EXHAUSTED' ||
+          result.errorType === 'MARKETPLACE_COOLDOWN')
+      ) {
+        jobsRepo.updateNextRun(job.id, getNextMorning())
+        continue
+      }
 
       // Save snapshot — same logic as the manual capture IPC handler
       let c = competitor
@@ -156,17 +239,22 @@ async function processDueJobs(): Promise<void> {
         })
       }
 
-      // Schedule next run with random jitter
-      const intervalMs = job.interval_minutes * 60 * 1000
-      const jitter = Math.floor(Math.random() * 15 * 60 * 1000) // ±0-15 min jitter
-      const nextRun = toSqliteDatetime(new Date(Date.now() + intervalMs + jitter))
-      jobsRepo.updateNextRun(job.id, nextRun)
+      // Schedule next run. The default cadence is two workday checks:
+      // one immediately when due, one roughly 6h later, then tomorrow morning.
+      scheduleNextRun(job.id, job.interval_minutes, jobsRepo, db, competitor.id)
 
       // Random delay between jobs
       const delay =
         Math.floor(Math.random() * (MAX_DELAY_BETWEEN_JOBS_MS - MIN_DELAY_BETWEEN_JOBS_MS + 1)) +
         MIN_DELAY_BETWEEN_JOBS_MS
       await sleep(delay)
+    }
+
+    const storesRepo = new SellerStoresRepository(db)
+    for (const store of storesRepo.findActive()) storesRepo.ensureJob(store.id)
+    for (const store of storesRepo.dueStores()) {
+      if (_state !== 'running') break
+      await scanSellerStore(db, store)
     }
   } catch {
     // Scheduler errors should not crash the app — log and continue

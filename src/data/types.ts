@@ -30,9 +30,14 @@ export type CaptureErrorType =
   | 'PRODUCT_NOT_FOUND'
   | 'CAPTCHA_DETECTED'
   | 'REGION_BLOCKED'
+  | 'DELIVERY_LOCATION_FAILED'
   | 'PARSER_FAILED'
   | 'NETWORK_TIMEOUT'
   | 'UNKNOWN_ERROR'
+  | 'HTTP_429'
+  | 'HTTP_503'
+  | 'PAGE_BUDGET_EXHAUSTED'
+  | 'MARKETPLACE_COOLDOWN'
   | null
 
 export interface Snapshot {
@@ -41,6 +46,10 @@ export interface Snapshot {
   title: string | null
   price: number | null
   currency: string | null
+  price_type: string | null
+  regular_price: number | null
+  list_price: number | null
+  delivery_location: string | null
   rating: number | null
   review_count: number | null
   availability: string | null
@@ -51,7 +60,11 @@ export interface Snapshot {
   error_message: string | null
 }
 
-export type NewSnapshot = Omit<Snapshot, 'id'>
+export type NewSnapshot = Omit<
+  Snapshot,
+  'id' | 'price_type' | 'regular_price' | 'list_price' | 'delivery_location'
+> &
+  Partial<Pick<Snapshot, 'price_type' | 'regular_price' | 'list_price' | 'delivery_location'>>
 
 // --- Monitor Job ---
 
@@ -91,6 +104,91 @@ export interface Setting {
   key: string
   value: string
   updated_at: string
+}
+
+export type SellerStoreStatus = 'active' | 'paused' | 'error'
+export type StoreCaptureStatus = 'success' | 'failed' | 'partial'
+export type StoreEventType =
+  | 'new_visible'
+  | 'suspected_missing'
+  | 'restored'
+  | 'price_changed'
+  | 'promotion_changed'
+  | 'availability_changed'
+
+export interface SellerStore {
+  id: number
+  seller_id: string
+  marketplace: string
+  profile_url: string
+  storefront_url: string
+  name: string | null
+  logo_url: string | null
+  status: SellerStoreStatus
+  consecutive_failures: number
+  rotation_page: number
+  created_at: string
+  updated_at: string
+}
+
+export type NewSellerStore = Omit<SellerStore, 'id' | 'created_at' | 'updated_at'>
+
+export interface SellerStoreSnapshot {
+  id: number
+  store_id: number
+  public_rating: number | null
+  feedback_count: number | null
+  positive_30d: number | null
+  positive_90d: number | null
+  positive_365d: number | null
+  reported_product_count: number | null
+  scanned_product_count: number
+  captured_at: string
+  capture_status: StoreCaptureStatus
+  error_type: string | null
+  error_message: string | null
+}
+
+export type NewSellerStoreSnapshot = Omit<SellerStoreSnapshot, 'id'>
+
+export interface SellerStoreProduct {
+  id: number
+  store_id: number
+  asin: string
+  title: string | null
+  image_url: string | null
+  listing_price: number | null
+  currency: string | null
+  rating: number | null
+  review_count: number | null
+  brand: string | null
+  category: string | null
+  detail_price: number | null
+  regular_price: number | null
+  list_price: number | null
+  coupon: string | null
+  deal_type: string | null
+  availability: string | null
+  is_watched: number
+  presence_status: 'visible' | 'suspected_missing'
+  missing_count: number
+  first_seen_at: string
+  last_seen_at: string
+  listing_captured_at: string | null
+  detail_captured_at: string | null
+  last_seen_page: number | null
+  updated_at: string
+}
+
+export interface SellerStoreEvent {
+  id: number
+  store_id: number
+  product_id: number | null
+  event_type: StoreEventType
+  old_value: string | null
+  new_value: string | null
+  is_read: number
+  detected_at: string
 }
 
 // --- Dashboard summary ---

@@ -26,6 +26,8 @@
     "src/renderer/**/*.d.ts",
     "src/data/**/*.ts",
     "src/capture/**/*.ts",
+    "src/monitoring/**/*.ts",
+    "src/storefront/**/*.ts",
     "tests/**/*.ts",
     "tests/**/*.tsx"
   ],

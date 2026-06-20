@@ -253,6 +253,16 @@ describe('parseAmazonInput — bare ASIN', () => {
       url: 'https://www.amazon.com/dp/B09N3YBZ7D'
     })
   })
+
+  it('uses selected marketplace for bare ASIN', () => {
+    const result = parseAmazonInput('B09N3YBZ7D', 'UK')
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.asin).toBe('B09N3YBZ7D')
+      expect(result.data.marketplace).toBe('UK')
+      expect(result.data.url).toBe('https://www.amazon.co.uk/dp/B09N3YBZ7D')
+    }
+  })
 })
 
 // ============================================================
@@ -290,6 +300,14 @@ describe('parseAmazonInput — error cases', () => {
 
     it('rejects amazon search URL', () => {
       fail('https://www.amazon.com/s?k=headphones', 'could not find an asin')
+    })
+
+    it('rejects URL marketplace that does not match selected marketplace', () => {
+      const result = parseAmazonInput('https://www.amazon.co.uk/dp/B0EXAMPLE1', 'US')
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error).toContain('URL belongs to UK')
+      }
     })
 
     it('rejects empty input', () => {

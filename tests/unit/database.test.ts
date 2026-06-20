@@ -1,12 +1,17 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import Database from 'better-sqlite3'
+import { existsSync, mkdtempSync, rmSync } from 'fs'
+import { tmpdir } from 'os'
+import { join } from 'path'
 import { createTestDb } from '../helpers/db'
+import { closeDatabase, initDatabase } from '../../src/data/database'
 
 describe('Database initialization and migrations', () => {
   let db: Database.Database
 
   afterEach(() => {
     if (db) db.close()
+    closeDatabase()
   })
 
   it('should create all tables on first run', () => {
@@ -24,13 +29,31 @@ describe('Database initialization and migrations', () => {
     expect(names).toContain('settings')
   })
 
+  it('should create a missing database directory on first run', () => {
+    const root = mkdtempSync(join(tmpdir(), 'ecom-radar-db-'))
+    const dbPath = join(root, 'nested', 'ecom-radar.db')
+
+    try {
+      db = initDatabase(dbPath)
+      expect(existsSync(dbPath)).toBe(true)
+    } finally {
+      closeDatabase()
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
   it('should record migration version', () => {
     db = createTestDb()
-    const row = db
-      .prepare('SELECT version, name FROM _migrations WHERE version = 1')
-      .get() as { version: number; name: string }
+    const row = db.prepare('SELECT version, name FROM _migrations WHERE version = 1').get() as {
+      version: number
+      name: string
+    }
     expect(row.version).toBe(1)
     expect(row.name).toBe('initial_schema')
+    const priceContext = db
+      .prepare('SELECT version, name FROM _migrations WHERE version = 2')
+      .get() as { version: number; name: string }
+    expect(priceContext.name).toBe('snapshot_price_context')
   })
 
   it('should not re-run migrations on second open', () => {
@@ -38,41 +61,49 @@ describe('Database initialization and migrations', () => {
     const firstCount = (
       db.prepare('SELECT COUNT(*) as cnt FROM _migrations').get() as { cnt: number }
     ).cnt
-    expect(firstCount).toBe(1)
+    expect(firstCount).toBe(3)
   })
 
   it('should enforce foreign keys', () => {
     db = createTestDb()
     // Try inserting a snapshot with non-existent competitor_id
     expect(() => {
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO snapshots (competitor_id, captured_at, capture_status)
         VALUES (999, datetime('now'), 'success')
-      `).run()
+      `
+      ).run()
     }).toThrow()
   })
 
   it('should enforce status check constraint on competitors', () => {
     db = createTestDb()
     expect(() => {
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO competitors (asin, marketplace, url, status)
         VALUES ('B00TEST', 'US', 'https://amazon.com/dp/B00TEST', 'invalid_status')
-      `).run()
+      `
+      ).run()
     }).toThrow()
   })
 
   it('should enforce capture_status check constraint on snapshots', () => {
     db = createTestDb()
     // First create a valid competitor
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO competitors (asin, marketplace, url) VALUES ('B00TEST', 'US', 'https://amazon.com/dp/B00TEST')
-    `).run()
+    `
+    ).run()
     expect(() => {
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO snapshots (competitor_id, captured_at, capture_status)
         VALUES (1, datetime('now'), 'invalid')
-      `).run()
+      `
+      ).run()
     }).toThrow()
   })
 })

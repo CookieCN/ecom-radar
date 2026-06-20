@@ -7,6 +7,8 @@ import { loadPage } from './browser'
 import { parseProductPage } from './page-parser'
 import type { NewSnapshot, CaptureErrorType } from '../data/types'
 import type { ParsedProduct } from './url-parser'
+import { getMarketplaceConfig } from '../shared/marketplaces'
+import type { NavigationAccessGuard } from './browser'
 
 export interface CaptureResult {
   success: true
@@ -37,9 +39,22 @@ const MIN_REQUIRED_FIELDS = 2 // need at least 2 of: title, price, rating, revie
  * Returns success: false for all other outcomes — URL parse failures, page load errors,
  * captcha/not-found/region-block, and insufficient parser output.
  */
-export async function captureProduct(input: string): Promise<CaptureOutput> {
+export async function captureProduct(
+  input: string,
+  marketplace?: string,
+  deliveryLocation?: string,
+  access?: NavigationAccessGuard
+): Promise<CaptureOutput> {
+  if (!marketplace) {
+    return {
+      success: false,
+      errorType: 'PARSER_FAILED',
+      errorMessage: 'Amazon marketplace is required before creating a capture task.'
+    }
+  }
+
   // Step 1: Parse input
-  const parsed = parseAmazonInput(input)
+  const parsed = parseAmazonInput(input, marketplace)
   if (!parsed.success) {
     return {
       success: false,
@@ -50,9 +65,21 @@ export async function captureProduct(input: string): Promise<CaptureOutput> {
   }
 
   const product = parsed.data
+  const config = getMarketplaceConfig(product.marketplace)
+  if (!config) {
+    return {
+      success: false,
+      errorType: 'DELIVERY_LOCATION_FAILED',
+      errorMessage: `No delivery profile exists for Amazon ${product.marketplace}.`,
+      product
+    }
+  }
+  const resolvedDeliveryLocation = deliveryLocation?.trim() || config.defaultLocation
 
   // Step 2: Load the page
-  const pageResult = await loadPage(product.url)
+  const pageResult = access
+    ? await loadPage(product.url, product.marketplace, resolvedDeliveryLocation, access)
+    : await loadPage(product.url, product.marketplace, resolvedDeliveryLocation)
   if (!pageResult.success) {
     return {
       success: false,
@@ -66,12 +93,31 @@ export async function captureProduct(input: string): Promise<CaptureOutput> {
   let pageData
   try {
     pageData = parseProductPage(pageResult.html, pageResult.finalUrl)
-    console.log('[capture] parsed:', JSON.stringify({ url: product.url, title: pageData.title, price: pageData.price, rating: pageData.rating, reviews: pageData.reviewCount, availability: pageData.availability }))
+    console.log(
+      '[capture] parsed:',
+      JSON.stringify({
+        url: product.url,
+        title: pageData.title,
+        price: pageData.price,
+        rating: pageData.rating,
+        reviews: pageData.reviewCount,
+        availability: pageData.availability
+      })
+    )
   } catch (err) {
     return {
       success: false,
       errorType: 'PARSER_FAILED',
       errorMessage: `Failed to parse page content: ${err instanceof Error ? err.message : String(err)}`,
+      product
+    }
+  }
+
+  if (pageData.currency && pageData.currency !== config.currency) {
+    return {
+      success: false,
+      errorType: 'DELIVERY_LOCATION_FAILED',
+      errorMessage: `Amazon ${config.code} returned ${pageData.currency} pricing, expected ${config.currency} for delivery location ${resolvedDeliveryLocation}.`,
       product
     }
   }
@@ -90,6 +136,10 @@ export async function captureProduct(input: string): Promise<CaptureOutput> {
     title: pageData.title,
     price: pageData.price,
     currency: pageData.currency,
+    price_type: pageData.priceType,
+    regular_price: pageData.regularPrice,
+    list_price: pageData.listPrice,
+    delivery_location: resolvedDeliveryLocation,
     rating: pageData.rating,
     review_count: pageData.reviewCount,
     availability: pageData.availability,

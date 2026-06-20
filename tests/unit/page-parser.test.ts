@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'fs'
 import { join } from 'path'
-import { parseProductPage, detectCaptcha, detectProductNotFound, detectRegionBlock } from '../../src/capture/page-parser'
+import {
+  parseProductPage,
+  detectCaptcha,
+  detectProductNotFound,
+  detectRegionBlock
+} from '../../src/capture/page-parser'
 
 const fixturesDir = join(__dirname, '..', 'fixtures')
 
@@ -61,7 +66,92 @@ describe('parseProductPage — DOM fallback', () => {
     expect(result.reviewCount).toBe(3210)
     expect(result.availability).toBe('In Stock')
     expect(result.imageUrl).toContain('61dom-only')
-    expect(result.currency).toBeNull() // DOM cannot detect currency
+    expect(result.currency).toBe('USD')
+  })
+
+  it('parses a German decimal-comma price only from the main price feature', () => {
+    const html = `
+      <div id="unrelated-recommendation"><span class="a-price"><span class="a-offscreen">16,60 €</span></span></div>
+      <div id="corePrice_feature_div"><span class="a-price"><span class="a-offscreen">99,99 €</span></span></div>
+    `
+    const result = parseProductPage(html, 'https://www.amazon.de/dp/B0DCBB2YTR')
+    expect(result.price).toBe(99.99)
+    expect(result.currency).toBe('EUR')
+  })
+
+  it('prefers the displayed Prime deal and keeps regular and list prices', () => {
+    const html = `
+      <script type="application/ld+json">
+        {"@type":"Product","name":"Deal Product","offers":{"price":"89.99","priceCurrency":"EUR"}}
+      </script>
+      <div id="corePrice_feature_div">
+        <span>Early Prime Day Deal</span>
+        <span class="a-price"><span class="a-offscreen">79,98 €</span></span>
+        <span class="a-text-price"><span class="a-offscreen">99,99 €</span></span>
+      </div>
+      <div id="buybox">
+        <span>Non-Deal Price</span>
+        <span class="a-price"><span class="a-offscreen">89,99 €</span></span>
+      </div>
+    `
+    const result = parseProductPage(html, 'https://www.amazon.de/dp/B0DCBB2YTR')
+    expect(result.price).toBe(79.98)
+    expect(result.priceType).toBe('PRIME_DEAL')
+    expect(result.regularPrice).toBe(89.99)
+    expect(result.listPrice).toBe(99.99)
+    expect(result.currency).toBe('EUR')
+  })
+
+  it('reports the currency actually rendered in the primary price region', () => {
+    const html = `
+      <div id="corePrice_feature_div">
+        <span class="a-price apex-pricetopay-value"><span class="a-offscreen">14.767JPY</span></span>
+      </div>
+    `
+    const result = parseProductPage(html, 'https://www.amazon.de/dp/B0DCBB2YTR')
+    expect(result.price).toBe(14767)
+    expect(result.currency).toBe('JPY')
+  })
+
+  it('parses localized German rating and parenthesized review count', () => {
+    const html = `
+      <span class="a-icon-alt">4,6 von 5 Sternen</span>
+      <span id="acrCustomerReviewText" aria-label="9.841 Rezensionen">(9.841)</span>
+    `
+    const result = parseProductPage(html, 'https://www.amazon.de/dp/B0DCBB2YTR')
+    expect(result.rating).toBe(4.6)
+    expect(result.reviewCount).toBe(9841)
+  })
+
+  it('does not use a price outside the main price or buy-box features', () => {
+    const html = `
+      <div id="corePrice_feature_div"></div>
+      <div id="unrelated-recommendation"><span class="a-price"><span class="a-offscreen">16,60 €</span></span></div>
+    `
+    expect(parseProductPage(html, 'https://www.amazon.de/dp/B0DCBB2YTR').price).toBeNull()
+  })
+
+  it('extracts a landing image when src appears before id', () => {
+    const html = '<img src="https://m.media-amazon.com/images/I/src-first.jpg" id="landingImage">'
+    expect(parseProductPage(html, 'https://www.amazon.com/dp/B0TEST').imageUrl).toBe(
+      'https://m.media-amazon.com/images/I/src-first.jpg'
+    )
+  })
+
+  it('prefers the high-resolution landing image', () => {
+    const html =
+      '<img id="landingImage" src="https://m.media-amazon.com/low.jpg" data-old-hires="https://m.media-amazon.com/high.jpg">'
+    expect(parseProductPage(html, 'https://www.amazon.com/dp/B0TEST').imageUrl).toBe(
+      'https://m.media-amazon.com/high.jpg'
+    )
+  })
+
+  it('extracts the dynamic landing image when no high-resolution URL exists', () => {
+    const html =
+      '<img id="landingImage" data-a-dynamic-image="{&quot;https://m.media-amazon.com/dynamic.jpg&quot;:[1000,1000]}" src="https://m.media-amazon.com/low.jpg">'
+    expect(parseProductPage(html, 'https://www.amazon.com/dp/B0TEST').imageUrl).toBe(
+      'https://m.media-amazon.com/dynamic.jpg'
+    )
   })
 })
 
@@ -98,12 +188,15 @@ describe('detectCaptcha', () => {
   })
 
   it('detects URL-based captcha', () => {
-    expect(detectCaptcha('<html></html>', 'https://www.amazon.com/errors/validateCaptcha')).toBe(true)
+    expect(detectCaptcha('<html></html>', 'https://www.amazon.com/errors/validateCaptcha')).toBe(
+      true
+    )
     expect(detectCaptcha('<html></html>', 'https://www.amazon.com/captcha/verify')).toBe(true)
   })
 
   it('detects robot check message', () => {
-    const html = '<html><body>To discuss automated access to Amazon data please contact us</body></html>'
+    const html =
+      '<html><body>To discuss automated access to Amazon data please contact us</body></html>'
     expect(detectCaptcha(html, 'https://www.amazon.com/dp/B0TEST')).toBe(true)
   })
 
@@ -135,12 +228,19 @@ describe('detectProductNotFound', () => {
 
 describe('detectRegionBlock', () => {
   it('detects region block message', () => {
-    const html = '<html><body>This item cannot be shipped to your selected delivery location.</body></html>'
+    const html =
+      '<html><body>This item cannot be shipped to your selected delivery location.</body></html>'
     expect(detectRegionBlock(html)).toBe(true)
   })
 
   it('detects not available in country', () => {
     const html = '<html><body>Not available in your country.</body></html>'
+    expect(detectRegionBlock(html)).toBe(true)
+  })
+
+  it('detects the dispatched wording returned by Amazon Germany', () => {
+    const html =
+      '<html><body>This item cannot be dispatched to your selected delivery location.</body></html>'
     expect(detectRegionBlock(html)).toBe(true)
   })
 

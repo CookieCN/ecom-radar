@@ -4,7 +4,7 @@
 
 import { execSync } from 'child_process'
 import { cpSync, existsSync, mkdirSync, rmSync } from 'fs'
-import { join, dirname } from 'path'
+import { basename, join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -41,7 +41,7 @@ if (existsSync(resourcesDir)) {
 mkdirSync(resourcesDir, { recursive: true })
 
 // Copy the chromium version directory
-const destDir = join(resourcesDir, 'chromium')
+const destDir = join(resourcesDir, basename(chromiumVersionDir))
 console.log('Copying to:', destDir)
 cpSync(chromiumVersionDir, destDir, { recursive: true })
 
